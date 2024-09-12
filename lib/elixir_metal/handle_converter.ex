@@ -1,7 +1,4 @@
 defmodule ElixirMetal.HandleConverter do
-  @moduledoc """
-  Converts between Erlang and native handles.
-  """
   @on_load :load_nif
 
   def load_nif do
@@ -14,9 +11,6 @@ defmodule ElixirMetal.HandleConverter do
     end
   end
 
-  @doc """
-  Converts an Erlang handle to a native handle.
-  """
   def convert_to_native_handle(_handle) do
     :erlang.nif_error(:nif_not_loaded)
   end

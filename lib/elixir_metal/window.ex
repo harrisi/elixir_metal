@@ -42,12 +42,11 @@ defmodule ElixirMetal.Window do
     frame = :wxFrame.new(wx, wxID_ANY(), ~c'Elixir Metal', opts)
     panel = :wxPanel.new(frame)
 
-    :wxWindow.connect(panel, :paint)
+    # :wxWindow.connect(panel, :paint)
     # :wxWindow.connect(frame, :idle)
 
     :wxFrame.connect(panel, :size)
     :wxWindow.show(frame)
-    # :wxWindow.show(panel)
 
     handle = :wxWindow.getHandle(panel)
 
@@ -85,15 +84,15 @@ defmodule ElixirMetal.Window do
   #   {:noreply, state}
   # end
 
-  @impl :wx_object
-  def handle_event(wx(obj: obj, event: wxPaint(type: type)) = _event, state) do
-    IO.inspect(type, label: "type")
-    # Must do a PaintDC and destroy it
-    dc = :wxPaintDC.new(obj)
-    :wxPaintDC.destroy(dc)
+  # @impl :wx_object
+  # def handle_event(wx(obj: obj, event: wxPaint(type: type)) = _event, state) do
+  #   IO.inspect(type, label: "type")
+  #   # Must do a PaintDC and destroy it
+  #   dc = :wxPaintDC.new(obj)
+  #   :wxPaintDC.destroy(dc)
 
-    {:noreply, state}
-  end
+  #   {:noreply, state}
+  # end
 
   @impl :wx_object
   def handle_event(wx(obj: obj, event: wxClose(type: :close_window)) = info, state) do
@@ -113,63 +112,18 @@ defmodule ElixirMetal.Window do
 
   @impl :wx_object
   def handle_info(:render, state) do
-    # cur_env = :wx.get_env()
-    # cur_pid = self() |> IO.inspect(label: "cur_pid")
-    # IO.inspect(cur_env, label: "cur_env")
-
     Process.send_after(self(), :render, 16)
 
     :wx.batch(fn ->
-      # spawn(fn -> render(state, cur_pid, cur_env) end)
-      # render(state, cur_pid, cur_env)
       case ElixirMetal.MetalRenderer.render_frame(state.renderer) do
         :ok ->
           IO.puts("Rendering frame")
 
-          # send(cur_pid, :ok)
           {:noreply, state}
         {:error, reason} ->
           IO.puts("Failed to render frame: #{inspect(reason)}")
           {:error, reason}
       end
     end)
-
-    # receive do
-    #   :ok ->
-    #     IO.puts("received")
-    #     :wx.set_env(cur_env)
-    #   _ -> raise "foo"
-    # end
-
-    # :wxWindow.refresh(state.panel)
-    # :wxWindow.update(state.panel)
-
-    # {:noreply, state}
-  end
-
-  defp render(state, cur_pid, cur_env) do
-    IO.inspect(self(), label: "nif")
-    IO.inspect(cur_pid, label: "window pid")
-    IO.puts("Setting env")
-    :wx.set_env(cur_env)
-    IO.inspect(:wxWindow.getHandle(state.panel), base: :hex)
-
-    # pu = :wxPopupWindow.new(state.frame)
-    # :wxPopupWindow.setForegroundColour(pu, {255, 0, 0})
-    # :wxPopupWindow.setBackgroundColour(pu, {0, 255, 0})
-    # :wxPopupWindow.show(pu)
-    # :wxPopupWindow.raise(pu)
-
-    # IO.inspect(:wx.get_env(), label: "second get_env env")
-
-    case ElixirMetal.MetalRenderer.render_frame(state.renderer) do
-      :ok ->
-        IO.puts("Rendering frame")
-
-        send(cur_pid, :ok)
-      {:error, reason} ->
-        IO.puts("Failed to render frame: #{inspect(reason)}")
-        {:error, reason}
-    end
   end
 end

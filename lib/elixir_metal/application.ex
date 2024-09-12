@@ -9,7 +9,6 @@ defmodule ElixirMetal.Application do
   def start(_type, _args) do
     children = [
       # Starts a worker by calling: ElixirMetal.Worker.start_link(arg)
-      # {ElixirMetal.Worker, arg}
       ElixirMetal.Window
     ]
 
