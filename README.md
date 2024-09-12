@@ -10,5 +10,6 @@ follow the same instructions from there to create a custom ERTS with wx.
 
 ```sh
 $ make
+$ mix deps.get
 $ mix run --no-halt
 ```
