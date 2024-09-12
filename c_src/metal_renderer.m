@@ -2,12 +2,14 @@
 #import <QuartzCore/CAMetalLayer.h>
 #import <Cocoa/Cocoa.h>
 #include <erl_nif.h>
+#include <simd/simd.h>
 
 typedef struct {
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
     id<MTLRenderPipelineState> pipelineState;
     id<MTLBuffer> vertexBuffer;
+    id<MTLBuffer> uniformBuffer;
     CAMetalLayer *metalLayer;
     NSView *view;
 } MetalRenderer;
@@ -16,6 +18,28 @@ static ErlNifResourceType *METAL_RENDERER_RESOURCE;
 
 static bool createPipelineState(MetalRenderer* renderer, char *priv_dir);
 static bool createVertexBuffer(MetalRenderer* renderer);
+
+static bool createUniformBuffer(MetalRenderer* renderer) {
+    renderer->uniformBuffer = [renderer->device newBufferWithLength:sizeof(simd_float4x4)
+                                                            options:MTLResourceStorageModeShared];
+    if (!renderer->uniformBuffer) {
+        NSLog(@"Failed to create uniform buffer");
+        return false;
+    }
+
+    return true;
+}
+
+static void updateUniformBuffer(MetalRenderer* renderer, float rotation) {
+    simd_float4x4 projectionMatrix = (simd_float4x4) {
+        .columns[0] = {cos(rotation), sin(rotation), 0.0f, 0.0f},
+        .columns[1] = {-sin(rotation), cos(rotation), 0.0f, 0.0f},
+        .columns[2] = {0.0f, 0.0f, 1.0f, 0.0f},
+        .columns[3] = {0.0f, 0.0f, 0.0f, 1.0f}
+    };
+
+    memcpy([renderer->uniformBuffer contents], &projectionMatrix, sizeof(simd_float4x4));
+}
 
 static ERL_NIF_TERM create_metal_renderer(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
     if (argc != 2) {
@@ -68,7 +92,9 @@ static ERL_NIF_TERM create_metal_renderer(ErlNifEnv* env, int argc, const ERL_NI
 
     NSLog(@"renderer command queue: %@", renderer->commandQueue);
 
-    if (!createPipelineState(renderer, priv_dir) || !createVertexBuffer(renderer)) {
+    if (!createPipelineState(renderer, priv_dir) || 
+        !createVertexBuffer(renderer) || 
+        !createUniformBuffer(renderer)) {
         enif_release_resource(renderer);
         return enif_make_tuple2(env, enif_make_atom(env, "error"), enif_make_atom(env, "initialization_failed"));
     }
@@ -141,14 +167,6 @@ static ERL_NIF_TERM render_frame(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
       return enif_make_badarg(env);
   }
 
-// typedef struct {
-//     id<MTLDevice> device;
-//     id<MTLCommandQueue> commandQueue;
-//     id<MTLRenderPipelineState> pipelineState;
-//     id<MTLBuffer> vertexBuffer;
-//     CAMetalLayer *metalLayer;
-// } MetalRenderer;
-
   NSLog(@"device: %@\ncommandQueue: %@\npipelineState: %@\nvertexBuffer: %@\nmetalLayer: %p\nsuperlayer: %p\nview: %p\nview layer: %p\n",
     renderer->device,
     renderer->commandQueue,
@@ -159,6 +177,10 @@ static ERL_NIF_TERM render_frame(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
     renderer->view,
     renderer->view.layer
   );
+
+  static float rotation = 0.0f;
+  rotation += 0.01f;
+  updateUniformBuffer(renderer, rotation);
 
   id<CAMetalDrawable> drawable = [renderer->metalLayer nextDrawable];
   if (!drawable) {
@@ -174,15 +196,13 @@ static ERL_NIF_TERM render_frame(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
   id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
   [renderEncoder setRenderPipelineState:renderer->pipelineState];
   [renderEncoder setVertexBuffer:renderer->vertexBuffer offset:0 atIndex:0];
+  [renderEncoder setVertexBuffer:renderer->uniformBuffer offset:0 atIndex:1];
   [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
   [renderEncoder endEncoding];
 
   [commandBuffer presentDrawable:drawable];
   [commandBuffer commit];
 
-  // ERL_NIF_TERM result = enif_make_resource(env, renderer);
-  // enif_release_resource(renderer);
-  // return enif_make_tuple2(env, enif_make_atom(env, "ok"), result);
   return enif_make_atom(env, "ok");
 }
 

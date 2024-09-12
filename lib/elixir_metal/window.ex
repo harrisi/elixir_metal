@@ -112,13 +112,14 @@ defmodule ElixirMetal.Window do
 
   @impl :wx_object
   def handle_info(:render, state) do
-    Process.send_after(self(), :render, 16)
+    # Process.send_after(self(), :render, 16)
 
     :wx.batch(fn ->
       case ElixirMetal.MetalRenderer.render_frame(state.renderer) do
         :ok ->
           IO.puts("Rendering frame")
 
+          send(self(), :render)
           {:noreply, state}
         {:error, reason} ->
           IO.puts("Failed to render frame: #{inspect(reason)}")
