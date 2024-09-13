@@ -223,9 +223,9 @@ static ERL_NIF_TERM resize_metal_renderer(ErlNifEnv* env, int argc, const ERL_NI
 }
 
 static ErlNifFunc nif_funcs[] = {
-    {"create_metal_renderer", 2, create_metal_renderer, ERL_NIF_DIRTY_JOB_IO_BOUND},
-    {"resize_metal_renderer", 3, resize_metal_renderer, ERL_NIF_DIRTY_JOB_IO_BOUND},
-    {"render_frame", 1, render_frame, ERL_NIF_DIRTY_JOB_IO_BOUND}
+    {"create_metal_renderer", 2, create_metal_renderer},
+    {"resize_metal_renderer", 3, resize_metal_renderer},
+    {"render_frame", 1, render_frame}
 };
 
 static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info) {
