@@ -5,13 +5,13 @@
 #include <simd/simd.h>
 
 typedef struct {
-    id<MTLDevice> device;
-    id<MTLCommandQueue> commandQueue;
-    id<MTLRenderPipelineState> pipelineState;
-    id<MTLBuffer> vertexBuffer;
-    id<MTLBuffer> uniformBuffer;
-    CAMetalLayer *metalLayer;
-    NSView *view;
+  id<MTLDevice> device;
+  id<MTLCommandQueue> commandQueue;
+  id<MTLRenderPipelineState> pipelineState;
+  id<MTLBuffer> vertexBuffer;
+  id<MTLBuffer> uniformBuffer;
+  CAMetalLayer *metalLayer;
+  NSView *view;
 } MetalRenderer;
 
 static ErlNifResourceType *METAL_RENDERER_RESOURCE;
@@ -20,143 +20,143 @@ static bool createPipelineState(MetalRenderer* renderer, char *priv_dir);
 static bool createVertexBuffer(MetalRenderer* renderer);
 
 static bool createUniformBuffer(MetalRenderer* renderer) {
-    renderer->uniformBuffer = [renderer->device newBufferWithLength:sizeof(simd_float4x4)
-                                                            options:MTLResourceStorageModeShared];
-    if (!renderer->uniformBuffer) {
-        NSLog(@"Failed to create uniform buffer");
-        return false;
-    }
+  renderer->uniformBuffer = [renderer->device newBufferWithLength:sizeof(simd_float4x4)
+                                                          options:MTLResourceStorageModeShared];
+  if (!renderer->uniformBuffer) {
+    NSLog(@"Failed to create uniform buffer");
+    return false;
+  }
 
-    return true;
+  return true;
 }
 
 static void updateUniformBuffer(MetalRenderer* renderer, float rotation) {
-    simd_float4x4 projectionMatrix = (simd_float4x4) {
-        .columns[0] = {cos(rotation), sin(rotation), 0.0f, 0.0f},
-        .columns[1] = {-sin(rotation), cos(rotation), 0.0f, 0.0f},
-        .columns[2] = {0.0f, 0.0f, 1.0f, 0.0f},
-        .columns[3] = {0.0f, 0.0f, 0.0f, 1.0f}
-    };
+  simd_float4x4 projectionMatrix = (simd_float4x4) {
+    .columns[0] = {cos(rotation), sin(rotation), 0.0f, 0.0f},
+      .columns[1] = {-sin(rotation), cos(rotation), 0.0f, 0.0f},
+      .columns[2] = {0.0f, 0.0f, 1.0f, 0.0f},
+      .columns[3] = {0.0f, 0.0f, 0.0f, 1.0f}
+  };
 
-    memcpy([renderer->uniformBuffer contents], &projectionMatrix, sizeof(simd_float4x4));
+  memcpy([renderer->uniformBuffer contents], &projectionMatrix, sizeof(simd_float4x4));
 }
 
 static ERL_NIF_TERM create_metal_renderer(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
-    if (argc != 2) {
-        return enif_make_badarg(env);
-    }
+  if (argc != 2) {
+    return enif_make_badarg(env);
+  }
 
-    unsigned long handle;
-    if (!enif_get_uint64(env, argv[0], &handle)) {
-        return enif_make_badarg(env);
-    }
+  unsigned long handle;
+  if (!enif_get_uint64(env, argv[0], &handle)) {
+    return enif_make_badarg(env);
+  }
 
-    unsigned length;
-    if (enif_get_string_length(env, argv[1], &length, ERL_NIF_UTF8) <= 0) {
-        return enif_make_badarg(env);
-    }
+  unsigned length;
+  if (enif_get_string_length(env, argv[1], &length, ERL_NIF_UTF8) <= 0) {
+    return enif_make_badarg(env);
+  }
 
-    char *priv_dir = enif_alloc(length + 1);
-    if (enif_get_string(env, argv[1], priv_dir, length + 1, ERL_NIF_UTF8) <= 0) {
-        enif_free(priv_dir);
-        return enif_make_badarg(env);
-    }
+  char *priv_dir = enif_alloc(length + 1);
+  if (enif_get_string(env, argv[1], priv_dir, length + 1, ERL_NIF_UTF8) <= 0) {
+    enif_free(priv_dir);
+    return enif_make_badarg(env);
+  }
 
-    MetalRenderer* renderer = enif_alloc_resource(METAL_RENDERER_RESOURCE, sizeof(MetalRenderer));
+  MetalRenderer* renderer = enif_alloc_resource(METAL_RENDERER_RESOURCE, sizeof(MetalRenderer));
 
-    renderer->device = MTLCreateSystemDefaultDevice();
-    if (!renderer->device) {
-      return enif_make_tuple2(env, enif_make_atom(env, "error"), enif_make_atom(env, "failed_to_create_device"));
-    }
+  renderer->device = MTLCreateSystemDefaultDevice();
+  if (!renderer->device) {
+    return enif_make_tuple2(env, enif_make_atom(env, "error"), enif_make_atom(env, "failed_to_create_device"));
+  }
 
-    dispatch_sync(dispatch_get_main_queue(), ^{
-        renderer->view = (NSView*)handle;
+  dispatch_sync(dispatch_get_main_queue(), ^{
+      renderer->view = (NSView*)handle;
 
-        renderer->metalLayer = [CAMetalLayer layer];
-        [renderer->view setWantsLayer:YES];
-        [renderer->view setLayer:renderer->metalLayer];
+      renderer->metalLayer = [CAMetalLayer layer];
+      [renderer->view setWantsLayer:YES];
+      [renderer->view setLayer:renderer->metalLayer];
 
-        renderer->metalLayer.device = renderer->device;
-        renderer->metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-    });
+      renderer->metalLayer.device = renderer->device;
+      renderer->metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+      });
 
-    NSLog(@"metalLayer: %p", renderer->metalLayer);
-    NSLog(@"view: %p", renderer->view);
-    NSLog(@"view layer: %@", renderer->view.layer);
-    NSLog(@"renderer device: %@", renderer->device);
+  NSLog(@"metalLayer: %p", renderer->metalLayer);
+  NSLog(@"view: %p", renderer->view);
+  NSLog(@"view layer: %@", renderer->view.layer);
+  NSLog(@"renderer device: %@", renderer->device);
 
-    renderer->commandQueue = [renderer->device newCommandQueue];
-    if (!renderer->commandQueue) {
-      return enif_make_tuple2(env, enif_make_atom(env, "error"), enif_make_atom(env, "failed_to_create_command_queue"));
-    }
+  renderer->commandQueue = [renderer->device newCommandQueue];
+  if (!renderer->commandQueue) {
+    return enif_make_tuple2(env, enif_make_atom(env, "error"), enif_make_atom(env, "failed_to_create_command_queue"));
+  }
 
-    NSLog(@"renderer command queue: %@", renderer->commandQueue);
+  NSLog(@"renderer command queue: %@", renderer->commandQueue);
 
-    if (!createPipelineState(renderer, priv_dir) || 
-        !createVertexBuffer(renderer) || 
-        !createUniformBuffer(renderer)) {
-        enif_release_resource(renderer);
-        return enif_make_tuple2(env, enif_make_atom(env, "error"), enif_make_atom(env, "initialization_failed"));
-    }
-
-    NSLog(@"pipeline state: %@", renderer->pipelineState);
-    NSLog(@"vertex buffer: %@", renderer->vertexBuffer);
-
-    ERL_NIF_TERM result = enif_make_resource(env, renderer);
+  if (!createPipelineState(renderer, priv_dir) || 
+      !createVertexBuffer(renderer) || 
+      !createUniformBuffer(renderer)) {
     enif_release_resource(renderer);
-    return enif_make_tuple2(env, enif_make_atom(env, "ok"), result);
+    return enif_make_tuple2(env, enif_make_atom(env, "error"), enif_make_atom(env, "initialization_failed"));
+  }
+
+  NSLog(@"pipeline state: %@", renderer->pipelineState);
+  NSLog(@"vertex buffer: %@", renderer->vertexBuffer);
+
+  ERL_NIF_TERM result = enif_make_resource(env, renderer);
+  enif_release_resource(renderer);
+  return enif_make_tuple2(env, enif_make_atom(env, "ok"), result);
 }
 
 static bool createPipelineState(MetalRenderer* renderer, char *priv_dir) {
-    NSError* error = nil;
+  NSError* error = nil;
 
-    NSString* metalLibPath = [NSString stringWithFormat:@"%s/default.metallib", priv_dir];
-    NSURL* metalLibURL = [NSURL fileURLWithPath:metalLibPath];
+  NSString* metalLibPath = [NSString stringWithFormat:@"%s/default.metallib", priv_dir];
+  NSURL* metalLibURL = [NSURL fileURLWithPath:metalLibPath];
 
-    id<MTLLibrary> library = [renderer->device newLibraryWithURL:metalLibURL error:&error];
-    if (!library) {
-        NSLog(@"Failed to load Metal library: %@", error);
-        return false;
-    }
+  id<MTLLibrary> library = [renderer->device newLibraryWithURL:metalLibURL error:&error];
+  if (!library) {
+    NSLog(@"Failed to load Metal library: %@", error);
+    return false;
+  }
 
-    id<MTLFunction> vertexFunction = [library newFunctionWithName:@"vertexShader"];
-    id<MTLFunction> fragmentFunction = [library newFunctionWithName:@"fragmentShader"];
+  id<MTLFunction> vertexFunction = [library newFunctionWithName:@"vertexShader"];
+  id<MTLFunction> fragmentFunction = [library newFunctionWithName:@"fragmentShader"];
 
-    if (!vertexFunction || !fragmentFunction) {
-        NSLog(@"Failed to load shader functions");
-        return false;
-    }
+  if (!vertexFunction || !fragmentFunction) {
+    NSLog(@"Failed to load shader functions");
+    return false;
+  }
 
-    MTLRenderPipelineDescriptor* pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-    pipelineStateDescriptor.vertexFunction = vertexFunction;
-    pipelineStateDescriptor.fragmentFunction = fragmentFunction;
-    pipelineStateDescriptor.colorAttachments[0].pixelFormat = renderer->metalLayer.pixelFormat;
+  MTLRenderPipelineDescriptor* pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+  pipelineStateDescriptor.vertexFunction = vertexFunction;
+  pipelineStateDescriptor.fragmentFunction = fragmentFunction;
+  pipelineStateDescriptor.colorAttachments[0].pixelFormat = renderer->metalLayer.pixelFormat;
 
-    renderer->pipelineState = [renderer->device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
-    if (!renderer->pipelineState) {
-        NSLog(@"Failed to create pipeline state: %@", error);
-        return false;
-    }
+  renderer->pipelineState = [renderer->device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+  if (!renderer->pipelineState) {
+    NSLog(@"Failed to create pipeline state: %@", error);
+    return false;
+  }
 
-    return true;
+  return true;
 }
 
 static bool createVertexBuffer(MetalRenderer* renderer) {
-    static const float triangleVertices[] = {
-        0.0f,  0.5f, 0.0f,
-       -0.5f, -0.5f, 0.0f,
-        0.5f, -0.5f, 0.0f
-    };
+  static const float triangleVertices[] = {
+    0.0f,  0.5f, 0.0f,
+    -0.5f, -0.5f, 0.0f,
+    0.5f, -0.5f, 0.0f
+  };
 
-    renderer->vertexBuffer = [renderer->device newBufferWithBytes:triangleVertices
-                                                           length:sizeof(triangleVertices)
-                                                          options:MTLResourceStorageModeShared];
-    if (!renderer->vertexBuffer) {
-        NSLog(@"Failed to create vertex buffer");
-        return false;
-    }
+  renderer->vertexBuffer = [renderer->device newBufferWithBytes:triangleVertices
+                                                         length:sizeof(triangleVertices)
+                                                        options:MTLResourceStorageModeShared];
+  if (!renderer->vertexBuffer) {
+    NSLog(@"Failed to create vertex buffer");
+    return false;
+  }
 
-    return true;
+  return true;
 }
 
 static ERL_NIF_TERM render_frame(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
@@ -164,19 +164,19 @@ static ERL_NIF_TERM render_frame(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
   MetalRenderer* renderer;
   if (argc != 1 ||
       !enif_get_resource(env, argv[0], METAL_RENDERER_RESOURCE, (void**)&renderer)) {
-      return enif_make_badarg(env);
+    return enif_make_badarg(env);
   }
 
   NSLog(@"device: %@\ncommandQueue: %@\npipelineState: %@\nvertexBuffer: %@\nmetalLayer: %p\nsuperlayer: %p\nview: %p\nview layer: %p\n",
-    renderer->device,
-    renderer->commandQueue,
-    renderer->pipelineState,
-    renderer->vertexBuffer,
-    renderer->metalLayer,
-    renderer->metalLayer.superlayer,
-    renderer->view,
-    renderer->view.layer
-  );
+      renderer->device,
+      renderer->commandQueue,
+      renderer->pipelineState,
+      renderer->vertexBuffer,
+      renderer->metalLayer,
+      renderer->metalLayer.superlayer,
+      renderer->view,
+      renderer->view.layer
+      );
 
   static float rotation = 0.0f;
   rotation += 0.01f;
@@ -207,30 +207,30 @@ static ERL_NIF_TERM render_frame(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
 }
 
 static ERL_NIF_TERM resize_metal_renderer(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
-    MetalRenderer* renderer;
-    unsigned int width, height;
+  MetalRenderer* renderer;
+  unsigned int width, height;
 
-    if (argc != 3 ||
-        !enif_get_resource(env, argv[0], METAL_RENDERER_RESOURCE, (void**)&renderer) ||
-        !enif_get_uint(env, argv[1], &width) ||
-        !enif_get_uint(env, argv[2], &height)) {
-        return enif_make_badarg(env);
-    }
+  if (argc != 3 ||
+      !enif_get_resource(env, argv[0], METAL_RENDERER_RESOURCE, (void**)&renderer) ||
+      !enif_get_uint(env, argv[1], &width) ||
+      !enif_get_uint(env, argv[2], &height)) {
+    return enif_make_badarg(env);
+  }
 
-    renderer->metalLayer.drawableSize = CGSizeMake(width, height);
+  renderer->metalLayer.drawableSize = CGSizeMake(width, height);
 
-    return enif_make_atom(env, "ok");
+  return enif_make_atom(env, "ok");
 }
 
 static ErlNifFunc nif_funcs[] = {
-    {"create_metal_renderer", 2, create_metal_renderer},
-    {"resize_metal_renderer", 3, resize_metal_renderer},
-    {"render_frame", 1, render_frame}
+  {"create_metal_renderer", 2, create_metal_renderer},
+  {"resize_metal_renderer", 3, resize_metal_renderer},
+  {"render_frame", 1, render_frame}
 };
 
 static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info) {
-    METAL_RENDERER_RESOURCE = enif_open_resource_type(env, NULL, "MetalRenderer", NULL, ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER, NULL);
-    return 0;
+  METAL_RENDERER_RESOURCE = enif_open_resource_type(env, NULL, "MetalRenderer", NULL, ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER, NULL);
+  return 0;
 }
 
 ERL_NIF_INIT(Elixir.ElixirMetal.MetalRenderer, nif_funcs, load, NULL, NULL, NULL)
